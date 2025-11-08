@@ -29,8 +29,13 @@ document.addEventListener("DOMContentLoaded", () => {
           <p><strong>Available Spots:</strong> ${details.max_participants - details.participants.length} of ${details.max_participants}</p>
           <div class="participants">
             <p><strong>Current Participants:</strong></p>
-            <ul class="participants-list">
-              ${details.participants.map(email => `<li>${email}</li>`).join('')}
+            <ul class="participants-list" data-activity="${name}">
+              ${details.participants.map(email => `
+                <li>
+                  ${email}
+                  <span class="delete-participant" data-email="${email}" title="Unregister participant">✖</span>
+                </li>
+              `).join('')}
             </ul>
           </div>
         `;
@@ -75,16 +80,56 @@ document.addEventListener("DOMContentLoaded", () => {
       messageDiv.classList.remove("hidden");
 
       if (response.ok) {
-        // Reload activities to show updated participants
-        loadActivities();
         // Reset form
         e.target.reset();
+        // Wait a moment for the server to update before reloading activities
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // Reload activities to show updated participants
+        await loadActivities();
       }
     } catch (error) {
       messageDiv.textContent = "An error occurred. Please try again.";
       messageDiv.className = "message error";
       messageDiv.classList.remove("hidden");
       console.error("Error signing up:", error);
+    }
+  });
+
+  // Handle unregister participant
+  document.addEventListener('click', async (e) => {
+    if (e.target.matches('.delete-participant')) {
+      const email = e.target.dataset.email;
+      const activityName = e.target.closest('.participants-list').dataset.activity;
+      
+      if (confirm(`Are you sure you want to unregister ${email} from ${activityName}?`)) {
+        try {
+          const response = await fetch(`/activities/${encodeURIComponent(activityName)}/unregister`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email })
+          });
+
+          const result = await response.json();
+          
+          if (response.ok) {
+            messageDiv.textContent = "Successfully unregistered participant!";
+            messageDiv.className = "message success";
+            // Reload activities to show updated participants
+            loadActivities();
+          } else {
+            messageDiv.textContent = result.detail;
+            messageDiv.className = "message error";
+          }
+          messageDiv.classList.remove("hidden");
+        } catch (error) {
+          messageDiv.textContent = "An error occurred. Please try again.";
+          messageDiv.className = "message error";
+          messageDiv.classList.remove("hidden");
+          console.error("Error unregistering participant:", error);
+        }
+      }
     }
   });
 
